@@ -1,0 +1,34 @@
+# Python
+.venv/
+venv/
+project_venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+build/
+dist/
+
+# Coverage and logs
+.coverage
+htmlcov/
+coverage/
+*.log
+logs/
+tmp/
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# Editors and OS
+.DS_Store
+.vscode/
+.idea/
+
+# Not part of this project
+node_modules/
+.github/
