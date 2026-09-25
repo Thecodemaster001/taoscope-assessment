@@ -6,6 +6,7 @@ import pytest
 
 from triage import ErrorCode, TriageError, TriageResult, triage_ticket
 from triage.contracts import MAX_TICKET_CHARS, TRIAGE_JSON_SCHEMA
+from triage.pipeline import DEFAULT_MODEL
 from triage.prompt import SYSTEM_PROMPT
 
 TICKET = "I was charged twice for my Pro plan this month, please help."
@@ -81,11 +82,59 @@ def test_connection_error_is_upstream():
     _expect(ErrorCode.UPSTREAM_ERROR, ticket_text=TICKET, client=client)
 
 
+def _status_error(cls, status):
+    import httpx2
+    return cls("error", response=httpx2.Response(status, request=_request()), body=None)
+
+
+@pytest.mark.parametrize("cls,status", [(anthropic.AuthenticationError, 401), (anthropic.PermissionDeniedError, 403)])
+def test_rejected_credentials_are_config_error(cls, status):
+    client = FakeClient(raises=_status_error(cls, status))
+    err = _expect(ErrorCode.CONFIG_ERROR, ticket_text=TICKET, client=client)
+    assert str(status) in err.message
+
+
+@pytest.mark.parametrize("cls,status", [(anthropic.RateLimitError, 429), (anthropic.InternalServerError, 500)])
+def test_retryable_status_is_upstream(cls, status):
+    client = FakeClient(raises=_status_error(cls, status))
+    _expect(ErrorCode.UPSTREAM_ERROR, ticket_text=TICKET, client=client)
+
+
 def test_missing_credentials_is_config_error(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
     client = anthropic.Anthropic(max_retries=0)
     _expect(ErrorCode.CONFIG_ERROR, ticket_text=TICKET, client=client)
+
+
+# --- configuration -----------------------------------------------------------------
+
+@pytest.mark.parametrize("value", ["soon", "0", "-5", "nan", "inf"])
+def test_bad_timeout_setting_is_config_error(monkeypatch, value):
+    monkeypatch.setenv("TRIAGE_TIMEOUT_S", value)
+    err = _expect(ErrorCode.CONFIG_ERROR, ticket_text=TICKET)
+    assert "TRIAGE_TIMEOUT_S" in err.message
+
+
+def test_model_comes_from_env_at_call_time(monkeypatch):
+    monkeypatch.setenv("TRIAGE_MODEL", "claude-haiku-5-5")
+    client = FakeClient(text=json.dumps(GOOD))
+    triage_ticket(TICKET, client=client)
+    assert client.calls[0]["model"] == "claude-haiku-5-5"
+
+
+def test_blank_model_env_falls_back_to_default(monkeypatch):
+    monkeypatch.setenv("TRIAGE_MODEL", "  ")
+    client = FakeClient(text=json.dumps(GOOD))
+    triage_ticket(TICKET, client=client)
+    assert client.calls[0]["model"] == DEFAULT_MODEL
+
+
+def test_explicit_model_argument_wins(monkeypatch):
+    monkeypatch.setenv("TRIAGE_MODEL", "claude-haiku-5-5")
+    client = FakeClient(text=json.dumps(GOOD))
+    triage_ticket(TICKET, client=client, model="claude-sonnet-5-5")
+    assert client.calls[0]["model"] == "claude-sonnet-5-5"
 
 
 # --- bad model output --------------------------------------------------------------

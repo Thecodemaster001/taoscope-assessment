@@ -5,6 +5,7 @@ specific ErrorCode. Nothing fails silently and no raw SDK exception escapes.
 """
 
 import json
+import math
 import os
 
 import anthropic
@@ -20,23 +21,42 @@ from triage.contracts import (
 )
 from triage.prompt import SYSTEM_PROMPT, build_user_message
 
-DEFAULT_MODEL = os.environ.get("TRIAGE_MODEL", "claude-opus-5")
-DEFAULT_TIMEOUT_S = float(os.environ.get("TRIAGE_TIMEOUT_S", "45"))
+DEFAULT_MODEL = "claude-opus-5"
+DEFAULT_TIMEOUT_S = 45.0
 MAX_OUTPUT_TOKENS = 4_096
 
 
-def make_client(timeout_s: float = DEFAULT_TIMEOUT_S) -> anthropic.Anthropic:
+def configured_model() -> str:
+    return os.environ.get("TRIAGE_MODEL", "").strip() or DEFAULT_MODEL
+
+
+def configured_timeout_s() -> float:
+    # Read per call, not at import, so a bad value surfaces as CONFIG_ERROR
+    # instead of a traceback when the package is imported.
+    raw = os.environ.get("TRIAGE_TIMEOUT_S", "").strip()
+    if not raw:
+        return DEFAULT_TIMEOUT_S
+    try:
+        timeout_s = float(raw)
+    except ValueError:
+        timeout_s = 0.0
+    if not (timeout_s > 0 and math.isfinite(timeout_s)):
+        raise TriageError(ErrorCode.CONFIG_ERROR, f"TRIAGE_TIMEOUT_S must be a positive number, got {raw!r}")
+    return timeout_s
+
+
+def make_client(timeout_s: float | None = None) -> anthropic.Anthropic:
     # One retry: the SDK retries timeouts/429/5xx, so worst-case wall clock is ~2x timeout.
-    return anthropic.Anthropic(timeout=timeout_s, max_retries=1)
+    return anthropic.Anthropic(timeout=timeout_s or configured_timeout_s(), max_retries=1)
 
 
 def triage_ticket(
     ticket_text: str,
     client: anthropic.Anthropic | None = None,
-    model: str = DEFAULT_MODEL,
+    model: str | None = None,
 ) -> TriageResult:
     text = _validate_input(ticket_text)
-    response = _call_model(client or make_client(), model, text)
+    response = _call_model(client or make_client(), model or configured_model(), text)
     raw = _extract_text(response)
     return _parse_result(raw)
 
@@ -80,6 +100,9 @@ def _call_model(client: anthropic.Anthropic, model: str, text: str):
         raise TriageError(ErrorCode.TIMEOUT, "model did not respond in time") from e
     except anthropic.APIConnectionError as e:
         raise TriageError(ErrorCode.UPSTREAM_ERROR, "could not reach the model API") from e
+    except (anthropic.AuthenticationError, anthropic.PermissionDeniedError) as e:
+        # A rejected key is a deployment problem, not a transient upstream failure.
+        raise TriageError(ErrorCode.CONFIG_ERROR, f"API credentials were rejected ({e.status_code})") from e
     except anthropic.RateLimitError as e:
         raise TriageError(ErrorCode.UPSTREAM_ERROR, "rate limited by the model API") from e
     except anthropic.APIStatusError as e:

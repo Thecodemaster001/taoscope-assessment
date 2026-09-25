@@ -39,9 +39,9 @@ truncated, because a cut-off ticket could be mis-triaged.
 | code               | when                                                   | CLI exit |
 |--------------------|--------------------------------------------------------|----------|
 | `invalid_input`    | empty / too short / too long / not a string; no model call | 2 |
-| `config_error`     | no API credentials                                     | 1 |
+| `config_error`     | no API credentials, key rejected (401/403), or a bad `TRIAGE_TIMEOUT_S` | 1 |
 | `timeout`          | model didn't respond within `TRIAGE_TIMEOUT_S` (after 1 retry) | 1 |
-| `upstream_error`   | network, rate limit, 4xx/5xx from the API              | 1 |
+| `upstream_error`   | network, rate limit, other 4xx/5xx from the API        | 1 |
 | `refused`          | `stop_reason == "refusal"`                             | 1 |
 | `truncated`        | `stop_reason == "max_tokens"`                          | 1 |
 | `empty_output`     | no text block, whitespace only, or blank summary/reply | 1 |
