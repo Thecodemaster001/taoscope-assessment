@@ -6,7 +6,7 @@ validated, typed result or an explicit, typed error. Nothing fails silently.
 ## Run
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 export ANTHROPIC_API_KEY=...
 
 .venv/bin/python -m triage "I was charged twice for my Pro plan this month."

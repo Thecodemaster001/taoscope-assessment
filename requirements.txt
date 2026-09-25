@@ -1,3 +1,2 @@
-anthropic>=1.8,<2
-pydantic>=2.7,<3
-pytest>=8
+anthropic>=2.6,<3
+pydantic>=2.14,<3
