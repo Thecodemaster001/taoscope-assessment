@@ -38,6 +38,7 @@ class FakeClient:
 
 def _request():
     import httpx2
+
     return httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
 
 
@@ -49,6 +50,7 @@ def _expect(code, **kw):
 
 
 # --- happy path ---------------------------------------------------------------
+
 
 def test_valid_ticket_returns_typed_result():
     client = FakeClient(text=json.dumps(GOOD))
@@ -63,6 +65,7 @@ def test_valid_ticket_returns_typed_result():
 
 # --- invalid input never reaches the model -------------------------------------
 
+
 @pytest.mark.parametrize("bad", ["", "   \n ", "short", "x" * (MAX_TICKET_CHARS + 1), None, 42])
 def test_invalid_input_rejected_before_model_call(bad):
     client = FakeClient(text=json.dumps(GOOD))
@@ -71,6 +74,7 @@ def test_invalid_input_rejected_before_model_call(bad):
 
 
 # --- upstream failures -----------------------------------------------------------
+
 
 def test_timeout_is_explicit():
     client = FakeClient(raises=anthropic.APITimeoutError(request=_request()))
@@ -84,6 +88,7 @@ def test_connection_error_is_upstream():
 
 def _status_error(cls, status):
     import httpx2
+
     return cls("error", response=httpx2.Response(status, request=_request()), body=None)
 
 
@@ -108,6 +113,7 @@ def test_missing_credentials_is_config_error(monkeypatch):
 
 
 # --- configuration -----------------------------------------------------------------
+
 
 @pytest.mark.parametrize("value", ["soon", "0", "-5", "nan", "inf"])
 def test_bad_timeout_setting_is_config_error(monkeypatch, value):
@@ -139,6 +145,7 @@ def test_explicit_model_argument_wins(monkeypatch):
 
 # --- bad model output --------------------------------------------------------------
 
+
 def test_no_text_block_is_empty_output():
     _expect(ErrorCode.EMPTY_OUTPUT, ticket_text=TICKET, client=FakeClient(text=None))
 
@@ -167,10 +174,13 @@ def test_refusal_is_explicit():
 
 
 def test_truncation_is_explicit():
-    _expect(ErrorCode.TRUNCATED, ticket_text=TICKET, client=FakeClient(text='{"category": "bil', stop_reason="max_tokens"))
+    _expect(
+        ErrorCode.TRUNCATED, ticket_text=TICKET, client=FakeClient(text='{"category": "bil', stop_reason="max_tokens")
+    )
 
 
 # --- contract drift guard -------------------------------------------------------------
+
 
 def test_api_schema_matches_pydantic_model():
     assert set(TRIAGE_JSON_SCHEMA["properties"]) == set(TriageResult.model_fields)

@@ -63,6 +63,7 @@ def triage_ticket(
 
 # --- Step 1: input validation (no model call on bad input) -------------------
 
+
 def _validate_input(ticket_text: object) -> str:
     if not isinstance(ticket_text, str):
         raise TriageError(ErrorCode.INVALID_INPUT, "ticket text must be a string")
@@ -78,6 +79,7 @@ def _validate_input(ticket_text: object) -> str:
 
 
 # --- Step 2: model call; SDK exceptions become TriageError -------------------
+
 
 def _call_model(client: anthropic.Anthropic, model: str, text: str):
     try:
@@ -111,6 +113,7 @@ def _call_model(client: anthropic.Anthropic, model: str, text: str):
 
 # --- Step 3: check stop reason and pull out the text -------------------------
 
+
 def _extract_text(response) -> str:
     if response.stop_reason == "refusal":
         raise TriageError(ErrorCode.REFUSED, "model declined to triage this ticket")
@@ -123,6 +126,7 @@ def _extract_text(response) -> str:
 
 
 # --- Step 4: parse JSON and validate against the contract --------------------
+
 
 def _parse_result(raw: str) -> TriageResult:
     try:

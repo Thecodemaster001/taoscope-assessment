@@ -1,6 +1,6 @@
 """Public contracts: what goes in, what comes out, and how it fails."""
 
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -41,14 +41,14 @@ TRIAGE_JSON_SCHEMA = {
 }
 
 
-class ErrorCode(str, Enum):
-    INVALID_INPUT = "invalid_input"        # caller's fault; never reaches the model
-    CONFIG_ERROR = "config_error"          # no API credentials configured
-    TIMEOUT = "timeout"                    # model did not answer in time
-    UPSTREAM_ERROR = "upstream_error"      # API/network/auth/rate-limit failure
-    REFUSED = "refused"                    # model declined (stop_reason == "refusal")
-    TRUNCATED = "truncated"                # hit max_tokens before finishing
-    EMPTY_OUTPUT = "empty_output"          # no text, or fields are blank
+class ErrorCode(StrEnum):
+    INVALID_INPUT = "invalid_input"  # caller's fault; never reaches the model
+    CONFIG_ERROR = "config_error"  # credentials missing or rejected, or a bad setting
+    TIMEOUT = "timeout"  # model did not answer in time
+    UPSTREAM_ERROR = "upstream_error"  # network, rate-limit or server failure
+    REFUSED = "refused"  # model declined (stop_reason == "refusal")
+    TRUNCATED = "truncated"  # hit max_tokens before finishing
+    EMPTY_OUTPUT = "empty_output"  # no text, or fields are blank
     MALFORMED_OUTPUT = "malformed_output"  # not JSON / fails TriageResult validation
 
 
