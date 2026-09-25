@@ -56,7 +56,13 @@ def triage_ticket(
     model: str | None = None,
 ) -> TriageResult:
     text = _validate_input(ticket_text)
-    response = _call_model(client or make_client(), model or configured_model(), text)
+    if client is None:
+        try:
+            client = make_client()
+        except anthropic.CredentialsError as e:
+            # Raised at construction when ANTHROPIC_PROFILE / ANTHROPIC_CONFIG_DIR point at a missing or unsafe file.
+            raise TriageError(ErrorCode.CONFIG_ERROR, f"could not load API credentials: {e}") from e
+    response = _call_model(client, model or configured_model(), text)
     raw = _extract_text(response)
     return _parse_result(raw)
 
@@ -98,6 +104,9 @@ def _call_model(client: anthropic.Anthropic, model: str, text: str):
         if "authentication" not in str(e):
             raise
         raise TriageError(ErrorCode.CONFIG_ERROR, "no API credentials; set ANTHROPIC_API_KEY") from e
+    except anthropic.CredentialsError as e:
+        # Profile and workload-identity credentials can also fail when a token is fetched or refreshed.
+        raise TriageError(ErrorCode.CONFIG_ERROR, f"could not load API credentials: {e}") from e
     except anthropic.APITimeoutError as e:  # subclass of APIConnectionError, so check first
         raise TriageError(ErrorCode.TIMEOUT, "model did not respond in time") from e
     except anthropic.APIConnectionError as e:

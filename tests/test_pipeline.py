@@ -112,6 +112,19 @@ def test_missing_credentials_is_config_error(monkeypatch):
     _expect(ErrorCode.CONFIG_ERROR, ticket_text=TICKET, client=client)
 
 
+def test_unreadable_credentials_profile_is_config_error(monkeypatch, tmp_path):
+    for var in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_PROFILE"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("ANTHROPIC_CONFIG_DIR", str(tmp_path / "missing"))
+    err = _expect(ErrorCode.CONFIG_ERROR, ticket_text=TICKET)
+    assert "credentials" in err.message
+
+
+def test_credentials_error_during_request_is_config_error():
+    client = FakeClient(raises=anthropic.CredentialsError("token exchange failed"))
+    _expect(ErrorCode.CONFIG_ERROR, ticket_text=TICKET, client=client)
+
+
 # --- configuration -----------------------------------------------------------------
 
 
